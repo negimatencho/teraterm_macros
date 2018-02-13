@@ -1,0 +1,269 @@
+;#################################################
+;# OS First Setup Macro
+;#   target os : CentOS 7
+;#   maintener : negimatencho
+;#################################################
+; マクロ初期設定
+timeout = 600
+
+; 対象ホストの取得
+inputbox '初期設定を行うホスト／ユーザを半角/で区切って指定してください' 'OS Setup'
+strsplit inputstr '/' 3
+
+HOST = groupmatchstr1
+USER = ""
+
+if result=1 then
+:user_retry
+  inputbox 'ユーザを入力してください' 'Input User'
+  strcompare inputstr ""
+  if result=0 goto user_retry
+  USER = inputstr
+else
+  USER = groupmatchstr2
+endif
+
+PASS = ''
+
+KEY = USER
+strconcat KEY '@'
+strconcat KEY HOST
+
+; パスワード取得
+ispassword 'pw.dat' KEY; result: 0=false; 1=true
+if result = 1 then
+  getpassword 'pw.dat' KEY PASS
+else
+  passwordbox 'パスワードを入力してください' USER
+  PASS = inputstr
+  setpassword 'pw.dat' KEY PASS
+endif
+
+; 対象ホストへログイン
+CMD = HOST
+strconcat CMD ':22 /ssh /2 /auth=password /user='
+strconcat CMD USER
+strconcat CMD ' /passwd='
+strconcat CMD PASS
+connect CMD
+wait ']#'
+
+
+yesnobox "OSの初期設定を行いますか？" "what's initialize OS."
+if result=0 goto finish
+
+
+:STEP1
+;#######################################
+; yumのアップデート
+sendln "yum update -y"
+wait ']#'
+
+
+;#######################################
+; 必須パッケージのインストール
+sendln "yum install -y wget bzip2 gcc openssl-devel readline-devel zlib-devel make"
+wait ']#'
+;#######################################
+; 不要パッケージのアンインストール
+sendln "yum remove -y postfix"
+wait ']#'
+
+
+:STEP2
+;#######################################
+; SELinuxの無効化
+yesnobox "SELinuxを無効化しますか？" "STEP:1"
+if result=0 goto STEP3
+
+sendln "setenforce 0"
+wait ']#'
+
+sendln "sed -e 's/^SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config > /etc/selinux/config.new"
+wait ']#'
+
+sendln "chmod --reference /etc/selinux/config /etc/selinux/config.new"
+wait ']#'
+
+sendln "mv -f /etc/selinux/config.new /etc/selinux/config"
+wait ']#'
+
+
+:STEP3
+;#######################################
+; dockerのインストール
+yesnobox "dockerをインストールしますか？" "STEP:2"
+if result=0 goto STEP4
+DOCKER_VERSION="17.12.0.ce-1.el7.centos"
+DOCKER_COMPOSE_VERSION="1.18.0"
+
+sendln "yum remove -y docker docker-common container-selinux docker-selinux docker-engine"
+wait ']#'
+
+sendln "yum install -y yum-utils"
+wait ']#'
+
+sendln "yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo"
+wait ']#'
+
+sendln "yum makecache fast"
+wait ']#'
+
+;# yum install -y docker-ce-17.12.0.ce-1.el7.centos
+send   "yum install -y docker-ce-"
+sendln DOCKER_VERSION
+wait ']#'
+
+sendln "systemctl enable docker"
+wait ']#'
+
+sendln "systemctl start docker"
+wait ']#'
+
+;# curl -L https://github.com/docker/compose/releases/download/1.18.0/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
+send   "curl -L https://github.com/docker/compose/releases/download/"
+send   DOCKER_COMPOSE_VERSION
+sendln "/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose"
+wait ']#'
+
+sendln "chmod +x /usr/local/bin/docker-compose"
+wait ']#'
+
+
+:STEP4
+;#######################################
+; gitインストール
+yesnobox "gitをインストールしますか？" "STEP:3"
+if result=0 goto STEP5
+GIT_VERSION="1.8.3.1-12.el7_4"
+
+;# yum install -y git-1.8.3.1-12.el7_4
+send   "yum install -y git-"
+sendln GIT_VERSION
+wait ']#'
+
+
+:STEP5
+;#######################################
+; rubyインストール
+yesnobox "rubyをインストールしますか？" "STEP:4"
+if result=0 goto STEP6
+RUBY_VERSION='2.5.0'
+
+sendln "rm -rf ~/.rbenv"
+wait ']#'
+
+sendln "yum remove -y ruby"
+wait ']#'
+
+sendln "git clone https://github.com/sstephenson/rbenv.git ~/.rbenv"
+wait ']#'
+
+;# echo 'export PATH="$HOME/.rbenv/bin:$PATH"' >> /etc/profile
+send   "echo 'export PATH="
+send   '"$HOME/.rbenv/bin:$PATH"'
+sendln "' >> /etc/profile"
+wait ']#'
+
+;# echo 'eval "$(rbenv init -)"' >> /etc/profile
+send   "echo 'eval "
+send   '"$(rbenv init -)"'
+sendln "' >> /etc/profile"
+wait ']#'
+
+sendln "source ~/etc/profile"
+wait ']#'
+
+sendln "git clone git://github.com/sstephenson/ruby-build.git ~/.rbenv/plugins/ruby-build"
+wait ']#'
+
+sendln "cd ~/.rbenv/plugins/ruby-build"
+wait ']#'
+
+sendln "./install.sh"
+wait ']#'
+
+sendln "cd"
+wait ']#'
+
+;# rbenv install 2.5.0
+send   "rbenv install "
+sendln RUBY_VERSION
+wait ']#'
+
+sendln "rbenv rehash"
+wait ']#'
+
+;# rbenv global 2.5.0
+send   "rbenv global "
+sendln RUBY_VERSION
+wait ']#'
+
+sendln "gem install bundler"
+wait ']#'
+
+
+:STEP6
+;#######################################
+; chefインストール
+yesnobox "chefをインストールしますか？" "STEP:5"
+if result=0 goto STEP7
+CHEF_VERSION="2.4.17-1"
+KNIFE_SOLO_VERSION="0.7.0.pre3"
+
+;# wget https://packages.chef.io/files/stable/chefdk/2.4.17/el/7/chefdk-2.4.17-1.el7.x86_64.rpm
+send   "wget https://packages.chef.io/files/stable/chefdk/2.4.17/el/7/chefdk-"
+send   CHEF_VERSION
+sendln ".el7.x86_64.rpm"
+wait ']#'
+
+;# yum localinstall -y ./chefdk-2.4.17-1.el7.x86_64.rpm
+send   "yum localinstall -y ./chefdk-"
+send   CHEF_VERSION
+sendln ".el7.x86_64.rpm"
+wait ']#'
+
+;# chef gem install knife-solo -v='0.7.0.pre3'
+send   "chef gem install knife-solo -v='"
+send   KNIFE_SOLO_VERSION
+sendln "'"
+wait ']#'
+
+;# chef gem install berkshelf
+sendln "chef gem install berkshelf"
+wait ']#'
+
+;# rm -f ./chefdk-2.4.17-1.el7.x86_64.rpm
+send   "rm -f ./chefdk-"
+send   CHEF_VERSION
+sendln ".el7.x86_64.rpm"
+wait ']#'
+
+
+:STEP7
+;#######################################
+;# 各パッケージのバージョン表示
+send   "echo '';echo '==================== install packages version information ====================';"
+send   "echo -n 'OS version             : ';cat /etc/redhat-release;"
+send   "echo -n 'SELinux status         : ';getenforce;"
+send   "echo -n 'Docker version         : ';docker -v;"
+send   "echo -n 'Docker Compose Version : ';docker-compose -v;"
+send   "echo -n 'git version            : ';git --version;"
+send   "echo -n 'ruby version           : ';ruby -v;"
+send   "echo -n 'rbenv version          : ';rbenv -v;"
+send   "echo -n 'gem version            : ';gem -v;"
+send   "echo -n 'bundler version        : ';bundler -v;"
+send   "chef -v;"
+send   "chef gem list | grep knife-solo;"
+sendln "echo '=============================================================================='"
+wait ']#'
+;#######################################
+; 初期セットアップ完了
+yesnobox "一度ＯＳを再起動します" "shutdown -r now"
+if result=0 goto finish
+sendln "shutdown -r now"
+
+
+:finish
+
+end
