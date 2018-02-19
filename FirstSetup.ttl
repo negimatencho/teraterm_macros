@@ -49,17 +49,20 @@ connect CMD
 wait ']#'
 
 
-yesnobox "OSの初期設定を行いますか？" "what's initialize OS."
+yesnobox "OSの初期設定を行いますか？" "do you want to initialize OS."
 if result=0 goto finish
 
 
 :STEP1
 ;#######################################
 ; yumのアップデート
+yesnobox "yumをアップデートしますか？" "STEP:1"
+if result=0 goto STEP2
 sendln "yum update -y"
 wait ']#'
 
 
+:STEP2
 ;#######################################
 ; 必須パッケージのインストール
 sendln "yum install -y wget bzip2 gcc openssl-devel readline-devel zlib-devel make"
@@ -70,11 +73,11 @@ sendln "yum remove -y postfix"
 wait ']#'
 
 
-:STEP2
+:STEP3
 ;#######################################
 ; SELinuxの無効化
-yesnobox "SELinuxを無効化しますか？" "STEP:1"
-if result=0 goto STEP3
+yesnobox "SELinuxを無効化しますか？" "STEP:2"
+if result=0 goto STEP4
 
 sendln "setenforce 0"
 wait ']#'
@@ -89,11 +92,11 @@ sendln "mv -f /etc/selinux/config.new /etc/selinux/config"
 wait ']#'
 
 
-:STEP3
+:STEP4
 ;#######################################
 ; dockerのインストール
-yesnobox "dockerをインストールしますか？" "STEP:2"
-if result=0 goto STEP4
+yesnobox "dockerをインストールしますか？" "STEP:3"
+if result=0 goto STEP5
 DOCKER_VERSION="17.12.0.ce-1.el7.centos"
 DOCKER_COMPOSE_VERSION="1.18.0"
 
@@ -130,11 +133,11 @@ sendln "chmod +x /usr/local/bin/docker-compose"
 wait ']#'
 
 
-:STEP4
+:STEP5
 ;#######################################
 ; gitインストール
-yesnobox "gitをインストールしますか？" "STEP:3"
-if result=0 goto STEP5
+yesnobox "gitをインストールしますか？" "STEP:4"
+if result=0 goto STEP6
 GIT_VERSION="1.8.3.1-12.el7_4"
 
 ;# yum install -y git-1.8.3.1-12.el7_4
@@ -143,11 +146,11 @@ sendln GIT_VERSION
 wait ']#'
 
 
-:STEP5
+:STEP6
 ;#######################################
 ; rubyインストール
-yesnobox "rubyをインストールしますか？" "STEP:4"
-if result=0 goto STEP6
+yesnobox "rubyをインストールしますか？" "STEP:5"
+if result=0 goto STEP7
 RUBY_VERSION='2.5.0'
 
 sendln "rm -rf ~/.rbenv"
@@ -171,7 +174,7 @@ send   '"$(rbenv init -)"'
 sendln "' >> /etc/profile"
 wait ']#'
 
-sendln "source ~/etc/profile"
+sendln "source /etc/profile"
 wait ']#'
 
 sendln "git clone git://github.com/sstephenson/ruby-build.git ~/.rbenv/plugins/ruby-build"
@@ -203,11 +206,11 @@ sendln "gem install bundler"
 wait ']#'
 
 
-:STEP6
+:STEP7
 ;#######################################
 ; chefインストール
-yesnobox "chefをインストールしますか？" "STEP:5"
-if result=0 goto STEP7
+yesnobox "chefをインストールしますか？" "STEP:6"
+if result=0 goto STEP8
 CHEF_VERSION="2.4.17-1"
 KNIFE_SOLO_VERSION="0.7.0.pre3"
 
@@ -240,7 +243,7 @@ sendln ".el7.x86_64.rpm"
 wait ']#'
 
 
-:STEP7
+:STEP8
 ;#######################################
 ;# 各パッケージのバージョン表示
 send   "echo '';echo '==================== install packages version information ====================';"
@@ -259,7 +262,7 @@ sendln "echo '==================================================================
 wait ']#'
 ;#######################################
 ; 初期セットアップ完了
-yesnobox "一度ＯＳを再起動します" "shutdown -r now"
+yesnobox "一度ＯＳを再起動しますか？" "shutdown -r now"
 if result=0 goto finish
 sendln "shutdown -r now"
 
