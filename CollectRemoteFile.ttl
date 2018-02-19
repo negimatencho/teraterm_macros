@@ -1,0 +1,114 @@
+;#################################################
+;# Remote Server's File Collector Macro
+;#   target os : CentOS 7
+;#   maintener : Y.Nemoto
+;#################################################
+; マクロ初期設定
+timeout = 600
+COLLECT_HOST = "192.168.1.232"
+LOGIN_USER = "root"
+COLLECT_LOCAL_HOME_DIR = "C:\Backups\"
+
+; 収集するファイルリスト
+; フォーマット：[arg1]@[arg2]@[arg3]
+;   arg1：収集対象のファイルがあるリモートサーバのパス
+;   arg2：収集対象ファイル（*を付与した場合、該当するファイル一覧の最新のファイルを収集）
+;   arg3：収集したファイルを格納する COLLECT_LOCAL_HOME_DIR 以下のローカルディレクトリ
+FILE_NUM = 2
+strdim COLLECT_FILES FILE_NUM
+COLLECT_FILES[0] = "/srv/docker/redmine/redmine/backups/@*_redmine_backup.tar@redmine"
+COLLECT_FILES[1] = "/srv/docker/gitlab/gitlab/backups/@*_gitlab_backup.tar@gitlab"
+
+PASS = ''
+
+KEY = LOGIN_USER
+strconcat KEY '@'
+strconcat KEY COLLECT_HOST
+
+; パスワード取得
+ispassword 'pw.dat' KEY; result: 0=false; 1=true
+if result = 1 then
+  getpassword 'pw.dat' KEY PASS
+else
+  passwordbox 'パスワードを入力してください' root
+  PASS = inputstr
+  setpassword 'pw.dat' KEY PASS
+endif
+
+; 対象ホストへログイン
+CMD = COLLECT_HOST
+strconcat CMD ':22 /ssh /2 /auth=password /user='
+strconcat CMD LOGIN_USER
+strconcat CMD ' /passwd='
+strconcat CMD PASS
+connect CMD
+
+if result <> 2 then
+	messagebox '接続できませんでした。' 'connection error'
+	end
+endif
+
+
+MAX = FILE_NUM - 1 
+for i 0 MAX
+	wait ']#'
+	strsplit COLLECT_FILES[i] '@' 3
+	REMOTE_DIR = groupmatchstr1
+	FILE_NAME = groupmatchstr2
+	LOCAL_DIR = groupmatchstr3
+
+	; リモートにある最新のファイルを取得
+	setsync 1
+	send "cd "
+	sendln REMOTE_DIR
+	wait ']#'
+	
+	send "ls -1t "
+	send FILE_NAME
+	sendln " | head -1"
+	recvln
+	recvln
+	FILE_NAME = inputstr
+	setsync 0
+
+	int2str si i
+	int2str smax MAX
+	TITLE = "["
+	strconcat TITLE si
+	strconcat TITLE "/"
+	strconcat TITLE smax
+	strconcat TITLE "] collect file name : "
+	strconcat TITLE FILE_NAME
+	settitle TITLE
+
+	; リモートファイルパス
+	REMOTE_FILE = REMOTE_DIR
+	strconcat REMOTE_FILE FILE_NAME
+
+	; ローカルファイルパス
+	LOCAL_FILE = COLLECT_LOCAL_HOME_DIR
+	strconcat LOCAL_FILE LOCAL_DIR
+	foldersearch LOCAL_FILE
+	if result=0 foldercreate LOCAL_FILE
+	strconcat LOCAL_FILE "\"
+	strconcat LOCAL_FILE FILE_NAME
+
+	; ファイル受信
+	scprecv REMOTE_FILE LOCAL_FILE
+	
+	; 受信完了確認
+	setsync 1
+	do
+		mpause 2000
+		sendln 'ps -ef | grep -v grep | grep -c "scp -f ' REMOTE_FILE '"'
+		recvln
+		recvln
+		strcompare inputstr '0'
+	loop while result != 0;
+	setsync 0
+next
+
+:finish
+sendln 'exit'
+
+end
