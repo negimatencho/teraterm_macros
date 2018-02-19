@@ -26,9 +26,9 @@ CentOS7を対象とした初回セットアップ用マクロ
 ## Requirement
 
 * Windows(execute OS)
- * ttpmacro.exe
+	* ttpmacro.exe
 * Linux Server(Setup OS)
- * CentOS7
+	* CentOS7
 
 ## Usage
 
