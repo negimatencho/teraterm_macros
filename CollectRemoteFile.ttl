@@ -5,8 +5,8 @@
 ;#################################################
 ; マクロ初期設定
 timeout = 600
-COLLECT_HOST = "192.168.1.232"
-LOGIN_USER = "root"
+COLLECT_HOST = ""
+LOGIN_USER = ""
 COLLECT_LOCAL_HOME_DIR = "C:\Backups\"
 
 ; 収集するファイルリスト
