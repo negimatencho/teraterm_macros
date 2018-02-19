@@ -1,7 +1,7 @@
 ;#################################################
 ;# Remote Server's File Collector Macro
 ;#   target os : CentOS 7
-;#   maintener : Y.Nemoto
+;#   maintener : negimatencho
 ;#################################################
 ; ƒ}ƒNƒ‰Šúİ’è
 timeout = 600
